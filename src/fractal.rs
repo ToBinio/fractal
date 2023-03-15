@@ -1,6 +1,6 @@
 use std::ops::Range;
 use std::sync::mpsc;
-use std::sync::mpsc::{Receiver, Sender, TryRecvError};
+use std::sync::mpsc::{Receiver, TryRecvError};
 use std::thread;
 
 use ggez::glam::Vec2;
@@ -19,6 +19,8 @@ const IMG_SIZE: u32 = 250;
 const MAX_ITER: u32 = 500;
 
 pub struct FractalNode {
+    complex_const: (f64, f64),
+
     img: Option<Image>,
     x_range: Range<f64>,
     y_range: Range<f64>,
@@ -29,6 +31,13 @@ pub struct FractalNode {
 }
 
 impl FractalNode {
+    pub fn new(complex_const: (f64, f64)) -> FractalNode {
+        FractalNode {
+            complex_const,
+            ..Default::default()
+        }
+    }
+
     pub fn draw(
         &mut self,
         ctx: &Context,
@@ -52,8 +61,8 @@ impl FractalNode {
 
             let screen_width = ctx.gfx.size().0 as f64;
             let screen_height = ctx.gfx.size().1 as f64;
-            let screen_left = off_set.0 as f64 - screen_width / 2.0;
-            let screen_top = off_set.1 as f64 - screen_height / 2.0;
+            let screen_left = off_set.0 - screen_width / 2.0;
+            let screen_top = off_set.1 - screen_height / 2.0;
 
             let mut has_drawn_completely = true;
 
@@ -141,24 +150,28 @@ impl FractalNode {
             FractalNode {
                 x_range: self.x_range.start..x_center,
                 y_range: y_center..self.y_range.end,
+                complex_const: self.complex_const,
                 ..Default::default()
             },
             //top right
             FractalNode {
                 x_range: x_center..self.x_range.end,
                 y_range: y_center..self.y_range.end,
+                complex_const: self.complex_const,
                 ..Default::default()
             },
             //bottom left
             FractalNode {
                 x_range: self.x_range.start..x_center,
                 y_range: self.y_range.start..y_center,
+                complex_const: self.complex_const,
                 ..Default::default()
             },
             //bottom right
             FractalNode {
                 x_range: x_center..self.x_range.end,
                 y_range: self.y_range.start..y_center,
+                complex_const: self.complex_const,
                 ..Default::default()
             },
         ]));
@@ -180,12 +193,10 @@ impl FractalNode {
                 self.rx = Some(rx);
                 let x_range = self.x_range.clone();
                 let y_range = self.y_range.clone();
+                let complex_const = self.complex_const;
 
                 thread::spawn(move || {
                     let mut image = DynamicImage::new_rgb8(IMG_SIZE, IMG_SIZE);
-
-                    let const_normal = -0.52347892134;
-                    let const_imaginary = 0.12345678;
 
                     let gradient = Gradient::new(vec![
                         LinSrgb::new(0.0, 0.0, 0.0),
@@ -213,8 +224,8 @@ impl FractalNode {
                                 let mut temp_imaginary = normal * imaginary * 2.0;
                                 temp_normal += -imaginary.powi(2);
 
-                                temp_normal += const_normal;
-                                temp_imaginary += const_imaginary;
+                                temp_normal += complex_const.0;
+                                temp_imaginary += complex_const.1;
 
                                 normal = temp_normal;
                                 imaginary = temp_imaginary;
@@ -242,11 +253,12 @@ impl FractalNode {
                         }
                     }
 
-                    tx.send(image).unwrap();
+                    if let Ok(_) = tx.send(image) {}
                 });
             }
-            Some(tx) => match tx.try_recv() {
-                Ok(image) => {
+
+            Some(tx) => {
+                if let Ok(image) = tx.try_recv() {
                     self.img = Some(Image::from_pixels(
                         ctx,
                         image.to_rgba8().as_bytes(),
@@ -255,8 +267,7 @@ impl FractalNode {
                         IMG_SIZE,
                     ));
                 }
-                Err(_) => {}
-            },
+            }
         }
     }
 }
@@ -264,6 +275,7 @@ impl FractalNode {
 impl Default for FractalNode {
     fn default() -> Self {
         FractalNode {
+            complex_const: (0.0, 0.0),
             img: None,
             x_range: -SIZE..SIZE,
             y_range: -SIZE..SIZE,
