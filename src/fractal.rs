@@ -7,10 +7,13 @@ use ggez::graphics::{
 use ggez::mint::Vector2;
 use ggez::Context;
 use image::{DynamicImage, EncodableLayout, GenericImage, Rgba};
+use palette::{Gradient, LinSrgb};
 
 const SIZE: f64 = 500.0;
 
 const IMG_SIZE: u32 = 250;
+
+const MAX_ITER: u32 = 500;
 
 pub struct FractalNode {
     img: Option<Image>,
@@ -144,6 +147,13 @@ impl FractalNode {
         let const_normal = -0.52134;
         let const_imaginary = 0.523;
 
+        let gradient = Gradient::new(vec![
+            LinSrgb::new(0.0, 0.0, 0.0),
+            LinSrgb::new(0.0, 0.0, 1.0),
+            LinSrgb::new(1.0, 0.0, 1.0),
+            LinSrgb::new(1.0, 0.0, 0.0),
+        ]);
+
         for x in 0..IMG_SIZE {
             'outer: for y in 0..IMG_SIZE {
                 let mut normal = ((x as f64 / IMG_SIZE as f64)
@@ -159,7 +169,7 @@ impl FractalNode {
                     * 2.0;
 
                 //todo
-                for i in 0..100 {
+                for i in 0..MAX_ITER {
                     let mut temp_normal = normal.powi(2);
                     let mut temp_imaginary = normal * imaginary * 2.0;
                     temp_normal += -imaginary.powi(2);
@@ -172,7 +182,19 @@ impl FractalNode {
 
                     let z = normal * normal + imaginary * imaginary;
                     if z > 4.0 {
-                        DynamicImage::put_pixel(&mut image, x, y, Rgba([i, i, i, 255]));
+                        let color = gradient.get(i as f64 / MAX_ITER as f64);
+
+                        DynamicImage::put_pixel(
+                            &mut image,
+                            x,
+                            y,
+                            Rgba([
+                                (color.red * 255.0) as u8,
+                                (color.green * 255.0) as u8,
+                                (color.blue * 255.0) as u8,
+                                255,
+                            ]),
+                        );
                         continue 'outer;
                     }
                 }
