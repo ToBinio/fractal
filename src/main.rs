@@ -27,13 +27,13 @@ struct MainState {
 impl MainState {
     fn new(_ctx: &mut Context) -> GameResult<MainState> {
         Ok(MainState {
-            fractal_node: FractalNode::new((0.0, 0.0)),
+            fractal_node: FractalNode::new((0.37, -0.3)),
             is_pressed: false,
             off_set: (0.0, 0.0),
             scale: 1.0,
             is_debug: false,
 
-            complex_const: (0.0, 0.0),
+            complex_const: (0.37, -0.3),
             complex_const_change: (0.0, 0.0),
         })
     }
@@ -87,7 +87,7 @@ impl event::EventHandler<GameError> for MainState {
         // 0.000003
         text.add(TextFragment::new(format!("Scale: {}\n", self.scale)));
         text.add(TextFragment::new(format!(
-            "Complex: {:.3} + {:.3}i",
+            "Complex: {:.2} + {:.2}i",
             self.complex_const.0, self.complex_const.1
         )));
 
