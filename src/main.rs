@@ -24,7 +24,6 @@ struct MainState {
     is_debug: bool,
 
     complex_const: (f64, f64),
-    complex_const_change: (f64, f64),
 }
 
 impl MainState {
@@ -37,22 +36,12 @@ impl MainState {
             is_debug: false,
 
             complex_const: (0.37, -0.3),
-            complex_const_change: (0.0, 0.0),
         })
     }
 }
 
 impl event::EventHandler<GameError> for MainState {
     fn update(&mut self, ctx: &mut Context) -> GameResult {
-        while ctx.time.check_update_time(5) {
-            self.complex_const.0 += self.complex_const_change.0 / 100.0;
-            self.complex_const.1 += self.complex_const_change.1 / 100.0;
-
-            if self.complex_const_change != (0.0, 0.0) {
-                self.fractal_node = FractalNode::new(self.complex_const);
-            }
-        }
-
         Ok(())
     }
 
@@ -73,15 +62,15 @@ impl event::EventHandler<GameError> for MainState {
             is_debug: self.is_debug,
             draw_count: 0,
         };
-        self.fractal_node.draw(
+        if self.fractal_node.draw(
             ctx,
             &mut fractal_canvas,
             self.scale,
             self.off_set,
             &mut debug,
-        );
-
-        fractal_canvas.finish(ctx)?;
+        ) {
+            fractal_canvas.finish(ctx)?;
+        };
 
         let mut ui_canvas = graphics::Canvas::from_frame(ctx, None);
 
@@ -163,29 +152,30 @@ impl event::EventHandler<GameError> for MainState {
         input: KeyInput,
         repeated: bool,
     ) -> Result<(), GameError> {
-        match input.keycode {
-            None => {}
-            Some(keycode) => match (keycode, repeated) {
-                (KeyCode::Space, _) => self.is_debug = !self.is_debug,
-                (KeyCode::Left, false) => self.complex_const_change.0 -= 1.0,
-                (KeyCode::Right, false) => self.complex_const_change.0 += 1.0,
-                (KeyCode::Down, false) => self.complex_const_change.1 -= 1.0,
-                (KeyCode::Up, false) => self.complex_const_change.1 += 1.0,
-                _ => {}
-            },
-        };
+        if repeated {
+            return Ok(());
+        }
 
-        Ok(())
-    }
-
-    fn key_up_event(&mut self, _ctx: &mut Context, input: KeyInput) -> Result<(), GameError> {
         match input.keycode {
             None => {}
             Some(keycode) => match keycode {
-                KeyCode::Left => self.complex_const_change.0 += 1.0,
-                KeyCode::Right => self.complex_const_change.0 -= 1.0,
-                KeyCode::Down => self.complex_const_change.1 += 1.0,
-                KeyCode::Up => self.complex_const_change.1 -= 1.0,
+                KeyCode::Space => self.is_debug = !self.is_debug,
+                KeyCode::Left => {
+                    self.complex_const.0 -= 0.01;
+                    self.fractal_node = FractalNode::new(self.complex_const);
+                }
+                KeyCode::Right => {
+                    self.complex_const.0 += 0.01;
+                    self.fractal_node = FractalNode::new(self.complex_const)
+                }
+                KeyCode::Down => {
+                    self.complex_const.1 -= 0.01;
+                    self.fractal_node = FractalNode::new(self.complex_const)
+                }
+                KeyCode::Up => {
+                    self.complex_const.1 += 0.01;
+                    self.fractal_node = FractalNode::new(self.complex_const)
+                }
                 _ => {}
             },
         };
@@ -205,4 +195,14 @@ pub fn main() -> GameResult {
 
     let state = MainState::new(&mut ctx)?;
     event::run(ctx, event_loop, state)
+
+    // let now = Instant::now();
+    //
+    // for _ in 0..100 {
+    //     compute_img(-2.0..2.0, -2.0..2.0, (-0.5, 0.3));
+    // }
+    //
+    // println!("{:?}", now.elapsed());
+    //
+    // Ok(())
 }

@@ -10,7 +10,7 @@ use ggez::graphics::{
 };
 use ggez::mint::Vector2;
 use ggez::Context;
-use image::{DynamicImage, EncodableLayout, ImageBuffer, Rgba};
+use image::{EncodableLayout, ImageBuffer, Rgba};
 
 pub const SIZE: f64 = 500.0;
 pub const IMG_SIZE: u32 = 250;
@@ -192,9 +192,7 @@ impl FractalNode {
                 let y_range = self.y_range.clone();
                 let complex_const = self.complex_const;
 
-                thread::spawn(move || {
-                    tx.send(compute_img(x_range, y_range, complex_const))
-                });
+                thread::spawn(move || tx.send(compute_img(x_range, y_range, complex_const)));
             }
 
             Some(tx) => {

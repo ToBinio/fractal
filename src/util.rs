@@ -2,7 +2,6 @@ use crate::fractal::{IMG_SIZE, SIZE};
 use image::{ImageBuffer, Rgba};
 use palette::{Gradient, LinSrgb};
 use std::ops::Range;
-use std::time::Instant;
 
 const MAX_ITER: u32 = 500;
 const MULTISAMPLE_SIZE: u32 = 1;
@@ -50,18 +49,15 @@ pub fn compute_img(
                         * 2.0;
 
                     for i in 0..MAX_ITER {
-                        let mut temp_normal = normal.powi(2);
-                        temp_normal += -imaginary.powi(2);
-                        let mut temp_imaginary = normal * imaginary * 2.0;
+                        let normal_2 = normal.powi(2);
+                        let imaginary_2 = imaginary.powi(2);
 
-                        temp_normal += complex_const.0;
-                        temp_imaginary += complex_const.1;
+                        let temp_normal = normal_2 - imaginary_2 + complex_const.0;
+                        imaginary = normal * imaginary * 2.0 + complex_const.1;
 
                         normal = temp_normal;
-                        imaginary = temp_imaginary;
 
-                        let size = normal.powi(2) + imaginary.powi(2);
-                        if size > 4.0 {
+                        if normal_2 + imaginary_2 > 4.0 {
                             iter_count = i;
                             break;
                         }
