@@ -1,4 +1,7 @@
 use std::ops::Range;
+use std::sync::mpsc;
+use std::sync::mpsc::{Receiver, Sender, TryRecvError};
+use std::thread;
 
 use ggez::glam::Vec2;
 use ggez::graphics::{
@@ -21,6 +24,8 @@ pub struct FractalNode {
     y_range: Range<f64>,
 
     sub_nodes: Option<Box<[FractalNode; 4]>>,
+
+    rx: Option<Receiver<DynamicImage>>,
 }
 
 impl FractalNode {
@@ -31,47 +36,10 @@ impl FractalNode {
         scale: f64,
         off_set: (f64, f64),
         debug: &mut Debug,
-    ) {
+    ) -> bool {
         if self.screen_scale(scale) < 1.0 {
             //render img cause pixel density is bigger than of the screen
-
-            //todo
-            // self.sub_nodes = None;
-
-            if self.img.is_none() {
-                self.generate_img(ctx);
-            }
-
-            debug.draw_count += 1;
-
-            canvas.draw(
-                self.img.as_ref().unwrap(),
-                DrawParam::default()
-                    .dest(Vec2::new(
-                        (self.x_range.start / scale - off_set.0) as f32,
-                        (self.y_range.start / scale - off_set.1) as f32,
-                    ))
-                    .scale(Vector2 {
-                        x: (self.img_scale() / scale) as f32,
-                        y: (self.img_scale() / scale) as f32,
-                    }),
-            );
-
-            if debug.is_debug {
-                let mesh = Mesh::new_rectangle(
-                    ctx,
-                    DrawMode::Stroke(StrokeOptions::default().with_line_width(2.0)),
-                    Rect::new(
-                        (self.x_range.start / scale - off_set.0) as f32,
-                        (self.y_range.start / scale - off_set.1) as f32,
-                        (IMG_SIZE as f64 * self.img_scale() / scale) as f32,
-                        (IMG_SIZE as f64 * self.img_scale() / scale) as f32,
-                    ),
-                    Color::YELLOW,
-                )
-                .expect("TODO: panic message");
-                canvas.draw(&mesh, DrawParam::default().z(10))
-            }
+            self.display(ctx, canvas, scale, off_set, debug)
         } else {
             //create subNodes pixel density is lower than of the screen
 
@@ -87,6 +55,8 @@ impl FractalNode {
             let screen_left = off_set.0 as f64 - screen_width / 2.0;
             let screen_top = off_set.1 as f64 - screen_height / 2.0;
 
+            let mut has_drawn_completely = true;
+
             for node in self.sub_nodes.as_mut().unwrap().iter_mut() {
                 if screen_left > node.x_range.end / scale
                     || screen_left + screen_width < node.x_range.start / scale
@@ -96,7 +66,68 @@ impl FractalNode {
                     continue;
                 }
 
-                node.draw(ctx, canvas, scale, off_set, debug);
+                if !node.draw(ctx, canvas, scale, off_set, debug) {
+                    has_drawn_completely = false
+                };
+            }
+
+            if !has_drawn_completely {
+                return self.display(ctx, canvas, scale, off_set, debug);
+            }
+
+            has_drawn_completely
+        }
+    }
+
+    fn display(
+        &mut self,
+        ctx: &Context,
+        canvas: &mut Canvas,
+        scale: f64,
+        off_set: (f64, f64),
+        debug: &mut Debug,
+    ) -> bool {
+        //todo
+        // self.sub_nodes = None;
+
+        match &self.img {
+            None => {
+                self.generate_img(ctx);
+                false
+            }
+            Some(img) => {
+                debug.draw_count += 1;
+
+                canvas.draw(
+                    img,
+                    DrawParam::default()
+                        .dest(Vec2::new(
+                            (self.x_range.start / scale - off_set.0) as f32,
+                            (self.y_range.start / scale - off_set.1) as f32,
+                        ))
+                        .scale(Vector2 {
+                            x: (self.img_scale() / scale) as f32,
+                            y: (self.img_scale() / scale) as f32,
+                        }),
+                );
+
+                if debug.is_debug {
+                    let mesh = Mesh::new_rectangle(
+                        ctx,
+                        DrawMode::Stroke(StrokeOptions::default().with_line_width(2.0)),
+                        Rect::new(
+                            (self.x_range.start / scale - off_set.0) as f32,
+                            (self.y_range.start / scale - off_set.1) as f32,
+                            (IMG_SIZE as f64 * self.img_scale() / scale) as f32,
+                            (IMG_SIZE as f64 * self.img_scale() / scale) as f32,
+                        ),
+                        Color::YELLOW,
+                    )
+                    .expect("TODO: panic message");
+                    canvas.draw(&mesh, DrawParam::default().z(10));
+                }
+
+                true
             }
         }
     }
@@ -142,74 +173,91 @@ impl FractalNode {
     }
 
     fn generate_img(&mut self, ctx: &Context) {
-        let mut image = DynamicImage::new_rgb8(IMG_SIZE, IMG_SIZE);
+        match &mut self.rx {
+            None => {
+                let (tx, rx) = mpsc::channel();
 
-        let const_normal = -0.52134;
-        let const_imaginary = 0.523;
+                self.rx = Some(rx);
+                let x_range = self.x_range.clone();
+                let y_range = self.y_range.clone();
 
-        let gradient = Gradient::new(vec![
-            LinSrgb::new(0.0, 0.0, 0.0),
-            LinSrgb::new(0.0, 0.0, 1.0),
-            LinSrgb::new(1.0, 0.0, 1.0),
-            LinSrgb::new(1.0, 0.0, 0.0),
-        ]);
+                thread::spawn(move || {
+                    let mut image = DynamicImage::new_rgb8(IMG_SIZE, IMG_SIZE);
 
-        for x in 0..IMG_SIZE {
-            'outer: for y in 0..IMG_SIZE {
-                let mut normal = ((x as f64 / IMG_SIZE as f64)
-                    * (self.x_range.end - self.x_range.start).abs()
-                    + self.x_range.start)
-                    / SIZE
-                    * 2.0;
+                    let const_normal = -0.52347892134;
+                    let const_imaginary = 0.12345678;
 
-                let mut imaginary = ((y as f64 / IMG_SIZE as f64)
-                    * (self.y_range.end - self.y_range.start).abs()
-                    + self.y_range.start)
-                    / SIZE
-                    * 2.0;
+                    let gradient = Gradient::new(vec![
+                        LinSrgb::new(0.0, 0.0, 0.0),
+                        LinSrgb::new(0.0, 0.0, 1.0),
+                        LinSrgb::new(1.0, 0.0, 1.0),
+                        LinSrgb::new(1.0, 0.0, 0.0),
+                    ]);
 
-                //todo
-                for i in 0..MAX_ITER {
-                    let mut temp_normal = normal.powi(2);
-                    let mut temp_imaginary = normal * imaginary * 2.0;
-                    temp_normal += -imaginary.powi(2);
+                    for x in 0..IMG_SIZE {
+                        'outer: for y in 0..IMG_SIZE {
+                            let mut normal = ((x as f64 / IMG_SIZE as f64)
+                                * (x_range.end - x_range.start).abs()
+                                + x_range.start)
+                                / SIZE
+                                * 2.0;
 
-                    temp_normal += const_normal;
-                    temp_imaginary += const_imaginary;
+                            let mut imaginary = ((y as f64 / IMG_SIZE as f64)
+                                * (y_range.end - y_range.start).abs()
+                                + y_range.start)
+                                / SIZE
+                                * 2.0;
 
-                    normal = temp_normal;
-                    imaginary = temp_imaginary;
+                            for i in 0..MAX_ITER {
+                                let mut temp_normal = normal.powi(2);
+                                let mut temp_imaginary = normal * imaginary * 2.0;
+                                temp_normal += -imaginary.powi(2);
 
-                    let z = normal * normal + imaginary * imaginary;
-                    if z > 4.0 {
-                        let color = gradient.get(i as f64 / MAX_ITER as f64);
+                                temp_normal += const_normal;
+                                temp_imaginary += const_imaginary;
 
-                        DynamicImage::put_pixel(
-                            &mut image,
-                            x,
-                            y,
-                            Rgba([
-                                (color.red * 255.0) as u8,
-                                (color.green * 255.0) as u8,
-                                (color.blue * 255.0) as u8,
-                                255,
-                            ]),
-                        );
-                        continue 'outer;
+                                normal = temp_normal;
+                                imaginary = temp_imaginary;
+
+                                let z = normal * normal + imaginary * imaginary;
+                                if z > 4.0 {
+                                    let color = gradient.get(i as f64 / MAX_ITER as f64);
+
+                                    DynamicImage::put_pixel(
+                                        &mut image,
+                                        x,
+                                        y,
+                                        Rgba([
+                                            (color.red * 255.0) as u8,
+                                            (color.green * 255.0) as u8,
+                                            (color.blue * 255.0) as u8,
+                                            255,
+                                        ]),
+                                    );
+                                    continue 'outer;
+                                }
+                            }
+
+                            image.put_pixel(x, y, Rgba([255, 255, 255, 255]));
+                        }
                     }
-                }
 
-                image.put_pixel(x, y, Rgba([255, 255, 255, 255]));
+                    tx.send(image).unwrap();
+                });
             }
+            Some(tx) => match tx.try_recv() {
+                Ok(image) => {
+                    self.img = Some(Image::from_pixels(
+                        ctx,
+                        image.to_rgba8().as_bytes(),
+                        ImageFormat::Rgba8Unorm,
+                        IMG_SIZE,
+                        IMG_SIZE,
+                    ));
+                }
+                Err(_) => {}
+            },
         }
-
-        self.img = Some(Image::from_pixels(
-            ctx,
-            image.to_rgba8().as_bytes(),
-            ImageFormat::Rgba8Unorm,
-            IMG_SIZE,
-            IMG_SIZE,
-        ));
     }
 }
 
@@ -220,6 +268,7 @@ impl Default for FractalNode {
             x_range: -SIZE..SIZE,
             y_range: -SIZE..SIZE,
             sub_nodes: None,
+            rx: None,
         }
     }
 }
