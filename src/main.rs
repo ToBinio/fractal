@@ -1,3 +1,4 @@
+use std::time::Instant;
 use ggez::conf::WindowMode;
 use ggez::event::MouseButton;
 use ggez::graphics::{Color, DrawParam, Rect, Sampler, Text, TextFragment};
@@ -10,8 +11,10 @@ use ggez::{
 };
 
 use crate::fractal::{Debug, FractalNode};
+use crate::util::compute_img;
 
 mod fractal;
+mod util;
 
 struct MainState {
     fractal_node: FractalNode,
@@ -192,14 +195,24 @@ impl event::EventHandler<GameError> for MainState {
 }
 
 pub fn main() -> GameResult {
-    let (mut ctx, event_loop) = ggez::ContextBuilder::new("super_simple", "To_Binio")
-        .window_mode(
-            WindowMode::default()
-                .dimensions(1280.0, 720.0)
-                .resizable(true),
-        )
-        .build()?;
+    // let (mut ctx, event_loop) = ggez::ContextBuilder::new("super_simple", "To_Binio")
+    //     .window_mode(
+    //         WindowMode::default()
+    //             .dimensions(1280.0, 720.0)
+    //             .resizable(true),
+    //     )
+    //     .build()?;
+    //
+    // let state = MainState::new(&mut ctx)?;
+    // event::run(ctx, event_loop, state)
 
-    let state = MainState::new(&mut ctx)?;
-    event::run(ctx, event_loop, state)
+    let instant = Instant::now();
+
+    for _ in 0..100 {
+        compute_img(-2.0..2.0, -2.0..2.0, (-0.5, 0.3));
+    }
+
+    println!("{:?}", instant.elapsed());
+
+    Ok(())
 }
