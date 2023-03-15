@@ -10,7 +10,7 @@ use ggez::graphics::{
 };
 use ggez::mint::Vector2;
 use ggez::Context;
-use image::{DynamicImage, EncodableLayout};
+use image::{DynamicImage, EncodableLayout, ImageBuffer, Rgba};
 
 pub const SIZE: f64 = 500.0;
 pub const IMG_SIZE: u32 = 250;
@@ -24,7 +24,7 @@ pub struct FractalNode {
 
     sub_nodes: Option<Box<[FractalNode; 4]>>,
 
-    rx: Option<Receiver<DynamicImage>>,
+    rx: Option<Receiver<ImageBuffer<Rgba<u8>, Vec<u8>>>>,
 }
 
 impl FractalNode {
@@ -201,7 +201,7 @@ impl FractalNode {
                 if let Ok(image) = tx.try_recv() {
                     self.img = Some(Image::from_pixels(
                         ctx,
-                        image.to_rgba8().as_bytes(),
+                        image.as_bytes(),
                         ImageFormat::Rgba8Unorm,
                         IMG_SIZE,
                         IMG_SIZE,

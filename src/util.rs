@@ -1,13 +1,18 @@
-use std::ops::Range;
-use image::{DynamicImage, GenericImage, Rgba};
-use palette::{Gradient, LinSrgb};
 use crate::fractal::{IMG_SIZE, SIZE};
+use image::{ImageBuffer, Rgba};
+use palette::{Gradient, LinSrgb};
+use std::ops::Range;
+use std::time::Instant;
 
 const MAX_ITER: u32 = 500;
 const MULTISAMPLE_SIZE: u32 = 1;
 
-pub fn compute_img(x_range: Range<f64>, y_range: Range<f64>, complex_const: (f64, f64)) -> DynamicImage {
-    let mut image = DynamicImage::new_rgb8(IMG_SIZE, IMG_SIZE);
+pub fn compute_img(
+    x_range: Range<f64>,
+    y_range: Range<f64>,
+    complex_const: (f64, f64),
+) -> ImageBuffer<Rgba<u8>, Vec<u8>> {
+    let mut image = ImageBuffer::new(IMG_SIZE, IMG_SIZE);
 
     let gradient = Gradient::new(vec![
         LinSrgb::new(0.0, 0.0, 0.0),
@@ -33,8 +38,7 @@ pub fn compute_img(x_range: Range<f64>, y_range: Range<f64>, complex_const: (f64
 
                     let mut iter_count = MAX_ITER;
 
-                    let mut normal = ((x / IMG_SIZE as f64)
-                        * (x_range.end - x_range.start).abs()
+                    let mut normal = ((x / IMG_SIZE as f64) * (x_range.end - x_range.start).abs()
                         + x_range.start)
                         / SIZE
                         * 2.0;
@@ -47,8 +51,8 @@ pub fn compute_img(x_range: Range<f64>, y_range: Range<f64>, complex_const: (f64
 
                     for i in 0..MAX_ITER {
                         let mut temp_normal = normal.powi(2);
-                        let mut temp_imaginary = normal * imaginary * 2.0;
                         temp_normal += -imaginary.powi(2);
+                        let mut temp_imaginary = normal * imaginary * 2.0;
 
                         temp_normal += complex_const.0;
                         temp_imaginary += complex_const.1;
@@ -56,7 +60,7 @@ pub fn compute_img(x_range: Range<f64>, y_range: Range<f64>, complex_const: (f64
                         normal = temp_normal;
                         imaginary = temp_imaginary;
 
-                        let size = normal * normal + imaginary * imaginary;
+                        let size = normal.powi(2) + imaginary.powi(2);
                         if size > 4.0 {
                             iter_count = i;
                             break;
@@ -70,8 +74,7 @@ pub fn compute_img(x_range: Range<f64>, y_range: Range<f64>, complex_const: (f64
             let iter_avg = iter_sum as f64 / MULTISAMPLE_SIZE.pow(2) as f64;
             let color = gradient.get(iter_avg / MAX_ITER as f64);
 
-            DynamicImage::put_pixel(
-                &mut image,
+            image.put_pixel(
                 x,
                 y,
                 Rgba([
