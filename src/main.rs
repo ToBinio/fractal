@@ -8,10 +8,8 @@ use ggez::{
     graphics::{self},
     Context, GameError, GameResult,
 };
-use std::time::Instant;
 
 use crate::fractal::{Debug, FractalNode};
-use crate::util::compute_img;
 
 mod fractal;
 mod util;
@@ -41,7 +39,7 @@ impl MainState {
 }
 
 impl event::EventHandler<GameError> for MainState {
-    fn update(&mut self, ctx: &mut Context) -> GameResult {
+    fn update(&mut self, _ctx: &mut Context) -> GameResult {
         Ok(())
     }
 

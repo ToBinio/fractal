@@ -1,9 +1,7 @@
 use std::ops::Range;
 use std::sync::mpsc;
 use std::sync::mpsc::Receiver;
-use std::thread;
 
-use crate::util::compute_img;
 use ggez::glam::Vec2;
 use ggez::graphics::{
     Canvas, Color, DrawMode, DrawParam, Image, ImageFormat, Mesh, Rect, StrokeOptions,
@@ -11,6 +9,8 @@ use ggez::graphics::{
 use ggez::mint::Vector2;
 use ggez::Context;
 use image::{EncodableLayout, ImageBuffer, Rgba};
+
+use crate::util::compute_img;
 
 pub const SIZE: f64 = 500.0;
 pub const IMG_SIZE: u32 = 250;
@@ -192,7 +192,12 @@ impl FractalNode {
                 let y_range = self.y_range.clone();
                 let complex_const = self.complex_const;
 
-                thread::spawn(move || tx.send(compute_img(x_range, y_range, complex_const)));
+                rayon::spawn(move || {
+                    match tx.send(compute_img(x_range, y_range, complex_const)) {
+                        Ok(_) => {}
+                        Err(_) => {}
+                    };
+                });
             }
 
             Some(tx) => {
